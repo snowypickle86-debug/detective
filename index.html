@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Detective - MRB</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: #131b2e;
+            --panel-border: #1f2d4a;
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.2);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --danger: #f43f5e;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Bar & Status */
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .stats-bar span {
+            color: var(--text-main);
+            font-weight: bold;
+        }
+
+        /* Main Workspace Layout */
+        .workspace {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar Navigation */
+        aside {
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            gap: 10px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid var(--panel-border);
+            color: var(--text-muted);
+            padding: 12px;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover, .nav-btn.active {
+            background-color: var(--accent-glow);
+            border-color: var(--accent-color);
+            color: var(--text-main);
+        }
+
+        /* Main Screen Area */
+        main {
+            background-color: var(--bg-color);
+            padding: 20px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .screen {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* Right Panel: Context & Notes */
+        .context-panel {
+            background-color: var(--panel-bg);
+            border-left: 1px solid var(--panel-border);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 5px;
+        }
+
+        /* Cards & Components */
+        .card {
+            background-color: var(--bg-color);
+            border: 1px solid var(--panel-border);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .case-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            background: var(--bg-color);
+        }
+
+        .case-item:hover {
+            border-color: var(--accent-color);
+        }
+
+        .case-item.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: #0b0f19;
+            border: none;
+            padding: 8px 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        /* Witness Grid */
+        .witness-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .witness-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 6px;
+            padding: 15px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .witness-card:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        .witness-avatar {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        /* Dialogue Box */
+        .dialogue-box {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 6px;
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .dialogue-history {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding-right: 10px;
+        }
+
+        .dialogue-line {
+            padding: 10px;
+            border-radius: 4px;
+            max-width: 80%;
+        }
+
+        .dialogue-line.witness {
+            background: var(--bg-color);
+            align-self: flex-start;
+            border-left: 3px solid var(--warning);
+        }
+
+        .dialogue-line.detective {
+            background: var(--accent-glow);
+            align-self: flex-end;
+            border-right: 3px solid var(--accent-color);
+        }
+
+        .dialogue-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .dialogue-option-btn {
+            background: var(--bg-color);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            padding: 10px;
+            text-align: left;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .dialogue-option-btn:hover {
+            border-color: var(--accent-color);
+            background: var(--accent-glow);
+        }
+
+        /* Timeline view */
+        .timeline-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .timeline-node {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--panel-bg);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .timeline-time {
+            font-weight: bold;
+            color: var(--accent-color);
+            min-width: 60px;
+        }
+
+        /* Utilities */
+        .badge {
+            background: var(--panel-border);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        
+        .flex-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header / Status Bar -->
+    <header>
+        <div class="logo">
+            <span>🕵️‍♂️</span> MEMORY RECONSTRUCTION BUREAU
+        </div>
+        <div class="stats-bar">
+            <div>Rank: <span id="stat-rank">Recruit</span></div>
+            <div>Active Case: <span id="stat-case">None</span></div>
+            <div>Weather: <span id="stat-weather">🌧 Rain (Night)</span></div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="workspace">
+        <!-- Sidebar -->
+        <aside>
+            <button class="nav-btn active" onclick="switchScreen('office')">📌 Case Board</button>
+            <button class="nav-btn" onclick="switchScreen('crime-scene')">🏢 Crime Scene</button>
+            <button class="nav-btn" onclick="switchScreen('interviews')">👥 Interviews</button>
+            <button class="nav-btn" onclick="switchScreen('timeline')">🕒 Timeline</button>
+            <button class="nav-btn" onclick="switchScreen('evidence')">📂 Evidence Board</button>
+            <button class="nav-btn" onclick="switchScreen('contradictions')">🔍 Contradictions</button>
+        </aside>
+
+        <!-- Main Screen -->
+        <main>
+            <!-- OFFICE / CASE BOARD SCREEN -->
+            <div id="screen-office" class="screen active">
+                <h2>Active Investigations</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Select an open case file to begin investigation.</p>
+                
+                <div class="case-item" onclick="startCase('Silent Library')">
+                    <div>
+                        <h3>📌 The Silent Library</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Difficulty: ★☆☆☆☆ | Status: Open</p>
+                    </div>
+                    <button class="btn">Investigate</button>
+                </div>
+
+                <div class="case-item locked">
+                    <div>
+                        <h3>📌 The Last Passenger</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Difficulty: ★★☆☆☆ | Status: Locked</p>
+                    </div>
+                    <span class="badge">Locked</span>
+                </div>
+
+                <div class="case-item locked">
+                    <div>
+                        <h3>📌 Midnight Hospital</h3>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Difficulty: ★★★☆☆ | Status: Locked</p>
+                    </div>
+                    <span class="badge">Locked</span>
+                </div>
+            </div>
+
+            <!-- CRIME SCENE SCREEN -->
+            <div id="screen-crime-scene" class="screen">
+                <h2>Crime Scene: The Silent Library</h2>
+                <div class="card">
+                    <h3>Environment Overview</h3>
+                    <p style="margin: 10px 0; color: var(--text-muted);">Books are scattered across the floor. The heavy oak door is jammed from the inside. A broken window lets in the cold night air and rain.</p>
+                    <div style="margin-top: 15px;" class="flex-row">
+                        <button class="btn" onclick="collectEvidence('Broken Window Glass')">Inspect Broken Window</button>
+                        <button class="btn" onclick="collectEvidence('Unknown Footprints')">Examine Muddy Footprints</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Discovered Clues</h3>
+                    <ul id="clue-list" style="padding-left: 20px; color: var(--text-muted);">
+                        <li>None yet. Search the environment.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- INTERVIEWS SCREEN -->
+            <div id="screen-interviews" class="screen">
+                <div id="witness-selection" style="display: flex; flex-direction: column; gap: 15px; height: 100%;">
+                    <h2>Witness Interviews</h2>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Select a witness to question their memory.</p>
+                    <div class="witness-grid">
+                        <div class="witness-card" onclick="openDialogue('Professor Alistair')">
+                            <div class="witness-avatar">👴</div>
+                            <h3>Professor Alistair</h3>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Victim's Colleague</p>
+                            <p style="font-size: 0.75rem; color: var(--warning); margin-top: 5px;">Memory: 95%</p>
+                        </div>
+                        <div class="witness-card" onclick="openDialogue('Librarian Martha')">
+                            <div class="witness-avatar">👵</div>
+                            <h3>Librarian Martha</h3>
+                            <p style="font-size: 0.8rem; color: var(--text-muted);">Night Shift Staff</p>
+                            <p style="font-size: 0.75rem; color: var(--danger); margin-top: 5px;">Memory: 60%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Dialogue Interface -->
+                <div id="witness-dialogue" class="dialogue-box" style="display: none;">
+                    <div class="flex-row" style="justify-content: space-between; border-bottom: 1px solid var(--panel-border); padding-bottom: 10px;">
+                        <div>
+                            <h3 id="dialogue-witness-name">Witness Name</h3>
+                            <span style="font-size: 0.8rem; color: var(--text-muted);" id="witness-mood">Mood: Calm 😊</span>
+                        </div>
+                        <button class="btn btn-secondary" onclick="closeDialogue()">End Interview</button>
+                    </div>
+
+                    <div class="dialogue-history" id="dialogue-history">
+                        <!-- Chat history appears here -->
+                    </div>
+
+                    <div class="dialogue-options" id="dialogue-options">
+                        <!-- Options generated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TIMELINE SCREEN -->
+            <div id="screen-timeline" class="screen">
+                <h2>Event Reconstruction Timeline</h2>
+                <div class="timeline-container">
+                    <div class="timeline-node">
+                        <div class="timeline-time">7:20 PM</div>
+                        <div>Professor Alistair arrives at the library archive.</div>
+                    </div>
+                    <div class="timeline-node">
+                        <div class="timeline-time">7:30 PM</div>
+                        <div>Librarian Martha leaves the front desk for break.</div>
+                    </div>
+                    <div class="timeline-node" style="border-color: var(--danger);">
+                        <div class="timeline-time">7:42 PM</div>
+                        <div>[Missing / Contradicted Event - Investigate to uncover]</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EVIDENCE BOARD SCREEN -->
+            <div id="screen-evidence" class="screen">
+                <h2>Evidence & Connections Board</h2>
+                <div class="card">
+                    <p style="color: var(--text-muted); margin-bottom: 15px;">Connected pieces of evidence found during the investigation:</p>
+                    <div id="evidence-board-items" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <span class="badge" style="padding: 8px 12px; font-size: 0.9rem;">Victim Profile</span>
+                        <span class="badge" style="padding: 8px 12px; font-size: 0.9rem;">Library Archive Room</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTRADICTIONS SCREEN -->
+            <div id="screen-contradictions" class="screen">
+                <h2>Contradiction Analysis</h2>
+                <div class="card">
+                    <h3>Active Paradoxes</h3>
+                    <p style="color: var(--text-muted); margin: 10px 0;">Compare witness statements against physical evidence to expose core lies.</p>
+                    <div class="case-item" style="cursor: default;">
+                        <div>
+                            <h4>Statement vs. Evidence Mismatch</h4>
+                            <p style="color: var(--text-muted); font-size: 0.85rem;">Alistair claims he never left the archive, but footprints match his shoes outside.</p>
+                        </div>
+                        <button class="btn" onclick="resolveContradiction()">Expose Lie</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel / Notebook & Stats -->
+        <div class="context-panel">
+            <div class="panel-title">Notebook</div>
+            <div class="card" style="font-size: 0.85rem; color: var(--text-muted);">
+                <p><strong>Current Task:</strong> Interview witnesses at the Silent Library and find the source of the altered memory.</p>
+            </div>
+
+            <div class="panel-title">Witness Trust Stats</div>
+            <div class="card" style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 8px;">
+                <div>Professor Alistair: <span style="color: var(--success);">Trust 50%</span></div>
+                <div>Librarian Martha: <span style="color: var(--warning);">Trust 30%</span></div>
+            </div>
+
+            <div class="panel-title">Atmosphere</div>
+            <div class="card" style="font-size: 0.85rem; color: var(--text-muted);">
+                <p>🌧 Steady rain hitting the pane.</p>
+                <p>🕰 Clock ticking rhythmically.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Navigation Handler
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById('screen-' + screenId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // Case Loader
+        function startCase(caseName) {
+            document.getElementById('stat-case').innerText = caseName;
+            alert("Case Loaded: " + caseName + "\nProceeding to investigation environment.");
+            switchScreen('crime-scene');
+        }
+
+        // Collect Evidence
+        function collectEvidence(item) {
+            const list = document.getElementById('clue-list');
+            if(list.children.length === 1 && list.children[0].innerText.includes('None')) {
+                list.innerHTML = '';
+            }
+            const li = document.createElement('li');
+            li.innerText = item + " collected.";
+            list.appendChild(li);
+
+            // Add to evidence board
+            const board = document.getElementById('evidence-board-items');
+            const badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.style.padding = '8px 12px';
+            badge.style.fontSize = '0.9rem';
+            badge.style.borderColor = 'var(--accent-color)';
+            badge.innerText = item;
+            board.appendChild(badge);
+        }
+
+        // Dialogue System
+        let currentWitness = '';
+        function openDialogue(witnessName) {
+            currentWitness = witnessName;
+            document.getElementById('witness-selection').style.display = 'none';
+            document.getElementById('witness-dialogue').style.display = 'flex';
+            document.getElementById('dialogue-witness-name').innerText = witnessName;
+
+            const history = document.getElementById('dialogue-history');
+            history.innerHTML = `<div class="dialogue-line witness">${witnessName} looks at you cautiously. "What do you want to know about what happened?"</div>`;
+            
+            loadDialogueOptions(1);
+        }
+
+        function closeDialogue() {
+            document.getElementById('witness-dialogue').style.display = 'none';
+            document.getElementById('witness-selection').style.display = 'flex';
+        }
+
+        function loadDialogueOptions(nodeId) {
+            const optionsBox = document.getElementById('dialogue-options');
+            optionsBox.innerHTML = '';
+
+            let choices = [];
+            if(nodeId === 1) {
+                choices = [
+                    { text: "Where were you when the lights went out?", next: 2 },
+                    { text: "Did you notice anything unusual about the victim's behavior?", next: 3 }
+                ];
+            } else if(nodeId === 2) {
+                appendDialogueLine("detective", "Where were you when the lights went out?");
+                appendDialogueLine("witness", currentWitness === "Professor Alistair" ? "I was working at my desk near the eastern shelf." : "I was sorting returns by the front counter.");
+                choices = [
+                    { text: "That conflicts with the security logs.", next: 4 },
+                    { text: "I see. Let's move on.", next: 1 }
+                ];
+            } else {
+                choices = [{ text: "End conversation for now.", next: 0 }];
+            }
+
+            choices.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = 'dialogue-option-btn';
+                btn.innerText = c.text;
+                btn.onclick = () => {
+                    if(c.next === 0) {
+                        closeDialogue();
+                    } else {
+                        loadDialogueOptions(c.next);
+                    }
+                };
+                optionsBox.appendChild(btn);
+            });
+        }
+
+        function appendDialogueLine(speaker, text) {
+            const history = document.getElementById('dialogue-history');
+            const div = document.createElement('div');
+            div.className = `dialogue-line ${speaker}`;
+            div.innerText = speaker === 'detective' ? "You: " + text : `${currentWitness}: ` + text;
+            history.appendChild(div);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function resolveContradiction() {
+            alert("Contradiction successfully exposed! Memory fragment stabilized.");
+        }
+    </script>
+</body>
+</html>
