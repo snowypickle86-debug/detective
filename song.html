@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Detective - Sound Generator</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: #131b2e;
+            --panel-border: #1f2d4a;
+            --accent-color: #38bdf8;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .generator-card {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 30px;
+            width: 450px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        h2 {
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: var(--accent-color);
+            color: #0b0f19;
+            border: none;
+            padding: 12px 24px;
+            font-weight: bold;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .status {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="generator-card">
+        <h2>🎵 Noir Audio Generator</h2>
+        <p>Click below to generate, play, and automatically download your procedural <strong>noir-soundtrack.wav</strong> file for Memory Detective.</p>
+        
+        <button class="btn" id="gen-btn" onclick="generateAndDownloadWAV()">Generate & Download Audio</button>
+        
+        <div class="status" id="status-text">Ready to synthesize atmosphere...</div>
+    </div>
+
+    <script>
+        function generateAndDownloadWAV() {
+            const status = document.getElementById('status-text');
+            status.innerText = "Synthesizing rainy noir jazz chords...";
+
+            const sampleRate = 44100;
+            const duration = 10; // 10 seconds looping track sample
+            const numChannels = 2;
+            const offlineCtx = new OfflineAudioContext(numChannels, sampleRate * duration, sampleRate);
+
+            const notes = [130.81, 155.56, 174.61, 196.00, 233.08]; // C minor blues vibe
+            
+            for (let t = 0; t < duration; t += 2) {
+                let freq = notes[Math.floor(Math.random() * notes.length)];
+                
+                let osc1 = offlineCtx.createOscillator();
+                let gain1 = offlineCtx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(freq, t);
+                
+                gain1.gain.setValueAtTime(0, t);
+                gain1.gain.linearRampToValueAtTime(0.1, t + 0.3);
+                gain1.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+                
+                osc1.connect(gain1);
+                gain1.connect(offlineCtx.destination);
+                osc1.start(t);
+                osc1.stop(t + 1.8);
+
+                let osc2 = offlineCtx.createOscillator();
+                let gain2 = offlineCtx.createGain();
+                osc2.type = 'triangle';
+                osc2.frequency.setValueAtTime(freq * 1.5, t + 0.5);
+                
+                gain2.gain.setValueAtTime(0, t + 0.5);
+                gain2.gain.linearRampToValueAtTime(0.05, t + 0.8);
+                gain2.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+                
+                osc2.connect(gain2);
+                gain2.connect(offlineCtx.destination);
+                osc2.start(t + 0.5);
+                osc2.stop(t + 1.6);
+            }
+
+            offlineCtx.startRendering().then(buffer => {
+                status.innerText = "Encoding audio file...";
+                let wavBlob = bufferToWave(buffer, buffer.length);
+                
+                let url = URL.createObjectURL(wavBlob);
+                let anchor = document.createElement('a');
+                anchor.href = url;
+                anchor.download = 'noir-soundtrack.wav';
+                document.body.appendChild(anchor);
+                anchor.click();
+                document.body.removeChild(anchor);
+
+                status.innerText = "Success! 'noir-soundtrack.wav' downloaded. Place it in your project folder alongside index.html.";
+            }).catch(err => {
+                console.error(err);
+                status.innerText = "Error during synthesis.";
+            });
+        }
+
+        function bufferToWave(abuffer, len) {
+            let numOfChan = abuffer.numberOfChannels,
+                length = len * numOfChan * 2 + 44,
+                buffer = new ArrayBuffer(length),
+                view = new DataView(buffer),
+                channels = [],
+                sampleRate = abuffer.sampleRate,
+                offset = 0,
+                pos = 0;
+
+            function writeString(str) {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(pos++, str.charCodeAt(i));
+                }
+            }
+
+            writeString('RIFF');
+            view.setUint32(pos, length - 8, true); pos += 4;
+            writeString('WAVE');
+            writeString('fmt ');
+            view.setUint32(pos, 16, true); pos += 4;
+            view.setUint16(pos, 1, true); pos += 2;
+            view.setUint16(pos, numOfChan, true); pos += 2;
+            view.setUint32(pos, sampleRate, true); pos += 4;
+            view.setUint32(pos, sampleRate * 2 * numOfChan, true); pos += 4;
+            view.setUint16(pos, numOfChan * 2, true); pos += 2;
+            view.setUint16(pos, 16, true); pos += 2;
+            writeString('data');
+            view.setUint32(pos, length - pos - 4, true); pos += 4;
+
+            for (let i = 0; i < abuffer.numberOfChannels; i++) {
+                channels.push(abuffer.getChannelData(i));
+            }
+
+            while (offset < len) {
+                for (let i = 0; i < numOfChan; i++) {
+                    let sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767);
+                    view.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+
+            return new Blob([buffer], { type: "audio/wav" });
+        }
+    </script>
+</body>
+</html>
